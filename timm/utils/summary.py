@@ -5,7 +5,8 @@ Hacked together by / Copyright 2020 Ross Wightman
 import csv
 import os
 from collections import OrderedDict
-try: 
+
+try:
     import wandb
 except ImportError:
     pass
@@ -28,13 +29,13 @@ def get_outdir(path, *paths, inc=False):
 
 
 def update_summary(
-        epoch,
-        train_metrics,
-        eval_metrics,
-        filename,
-        lr=None,
-        write_header=False,
-        log_wandb=False,
+    epoch,
+    train_metrics,
+    eval_metrics,
+    filename,
+    lr=None,
+    write_header=False,
+    log_wandb=False,
 ):
     rowd = OrderedDict(epoch=epoch)
     rowd.update([('train_' + k, v) for k, v in train_metrics.items()])

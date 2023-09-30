@@ -2,19 +2,23 @@ import dataclasses
 import logging
 import os
 from copy import deepcopy
-from typing import Optional, Dict, Callable, Any, Tuple
+from typing import Any, Callable, Dict, Optional, Tuple
 
-from torch import nn as nn
-from torch.hub import load_state_dict_from_url
-
-from timm.models._features import FeatureListNet, FeatureHookNet
+from timm.models._features import FeatureHookNet, FeatureListNet
 from timm.models._features_fx import FeatureGraphNet
 from timm.models._helpers import load_state_dict
-from timm.models._hub import has_hf_hub, download_cached_file, check_cached_file, load_state_dict_from_hf
+from timm.models._hub import (
+    check_cached_file,
+    download_cached_file,
+    has_hf_hub,
+    load_state_dict_from_hf,
+)
 from timm.models._manipulate import adapt_input_conv
 from timm.models._pretrained import PretrainedCfg
 from timm.models._prune import adapt_model_from_file
 from timm.models._registry import get_pretrained_cfg
+from torch import nn as nn
+from torch.hub import load_state_dict_from_url
 
 _logger = logging.getLogger(__name__)
 
@@ -24,8 +28,15 @@ _DOWNLOAD_PROGRESS = False
 _CHECK_HASH = False
 _USE_OLD_CACHE = int(os.environ.get('TIMM_USE_OLD_CACHE', 0)) > 0
 
-__all__ = ['set_pretrained_download_progress', 'set_pretrained_check_hash', 'load_custom_pretrained', 'load_pretrained',
-           'pretrained_cfg_for_features', 'resolve_pretrained_cfg', 'build_model_with_cfg']
+__all__ = [
+    'set_pretrained_download_progress',
+    'set_pretrained_check_hash',
+    'load_custom_pretrained',
+    'load_pretrained',
+    'pretrained_cfg_for_features',
+    'resolve_pretrained_cfg',
+    'build_model_with_cfg',
+]
 
 
 def _resolve_pretrained_source(pretrained_cfg):
@@ -74,21 +85,21 @@ def _resolve_pretrained_source(pretrained_cfg):
 
 
 def set_pretrained_download_progress(enable=True):
-    """ Set download progress for pretrained weights on/off (globally). """
+    """Set download progress for pretrained weights on/off (globally)."""
     global _DOWNLOAD_PROGRESS
     _DOWNLOAD_PROGRESS = enable
 
 
 def set_pretrained_check_hash(enable=True):
-    """ Set hash checking for pretrained weights on/off (globally). """
+    """Set hash checking for pretrained weights on/off (globally)."""
     global _CHECK_HASH
     _CHECK_HASH = enable
 
 
 def load_custom_pretrained(
-        model: nn.Module,
-        pretrained_cfg: Optional[Dict] = None,
-        load_fn: Optional[Callable] = None,
+    model: nn.Module,
+    pretrained_cfg: Optional[Dict] = None,
+    load_fn: Optional[Callable] = None,
 ):
     r"""Loads a custom (read non .pth) weight file
 
@@ -115,7 +126,9 @@ def load_custom_pretrained(
         _logger.warning("No pretrained weights exist for this model. Using random initialization.")
         return
     if load_from == 'hf-hub':
-        _logger.warning("Hugging Face hub not currently supported for custom load pretrained models.")
+        _logger.warning(
+            "Hugging Face hub not currently supported for custom load pretrained models."
+        )
     elif load_from == 'url':
         pretrained_loc = download_cached_file(
             pretrained_loc,
@@ -128,18 +141,20 @@ def load_custom_pretrained(
     elif hasattr(model, 'load_pretrained'):
         model.load_pretrained(pretrained_loc)
     else:
-        _logger.warning("Valid function to load pretrained weights is not available, using random initialization.")
+        _logger.warning(
+            "Valid function to load pretrained weights is not available, using random initialization."
+        )
 
 
 def load_pretrained(
-        model: nn.Module,
-        pretrained_cfg: Optional[Dict] = None,
-        num_classes: int = 1000,
-        in_chans: int = 3,
-        filter_fn: Optional[Callable] = None,
-        strict: bool = True,
+    model: nn.Module,
+    pretrained_cfg: Optional[Dict] = None,
+    num_classes: int = 1000,
+    in_chans: int = 3,
+    filter_fn: Optional[Callable] = None,
+    strict: bool = True,
 ):
-    """ Load pretrained checkpoint
+    """Load pretrained checkpoint
 
     Args:
         model (nn.Module) : PyTorch model module
@@ -152,7 +167,9 @@ def load_pretrained(
     """
     pretrained_cfg = pretrained_cfg or getattr(model, 'pretrained_cfg', None)
     if not pretrained_cfg:
-        raise RuntimeError("Invalid pretrained config, cannot load weights. Use `pretrained=False` for random init.")
+        raise RuntimeError(
+            "Invalid pretrained config, cannot load weights. Use `pretrained=False` for random init."
+        )
 
     load_from, pretrained_loc = _resolve_pretrained_source(pretrained_cfg)
     if load_from == 'state_dict':
@@ -186,7 +203,9 @@ def load_pretrained(
             state_dict = load_state_dict_from_hf(pretrained_loc)
     else:
         model_name = pretrained_cfg.get('architecture', 'this model')
-        raise RuntimeError(f"No pretrained weights exist for {model_name}. Use `pretrained=False` for random init.")
+        raise RuntimeError(
+            f"No pretrained weights exist for {model_name}. Use `pretrained=False` for random init."
+        )
 
     if filter_fn is not None:
         try:
@@ -204,12 +223,14 @@ def load_pretrained(
             try:
                 state_dict[weight_name] = adapt_input_conv(in_chans, state_dict[weight_name])
                 _logger.info(
-                    f'Converted input conv {input_conv_name} pretrained weights from 3 to {in_chans} channel(s)')
+                    f'Converted input conv {input_conv_name} pretrained weights from 3 to {in_chans} channel(s)'
+                )
             except NotImplementedError as e:
                 del state_dict[weight_name]
                 strict = False
                 _logger.warning(
-                    f'Unable to convert pretrained {input_conv_name} weights, using random init for this layer.')
+                    f'Unable to convert pretrained {input_conv_name} weights, using random init for this layer.'
+                )
 
     classifiers = pretrained_cfg.get('classifier', None)
     label_offset = pretrained_cfg.get('label_offset', 0)
@@ -250,7 +271,7 @@ def _filter_kwargs(kwargs, names):
 
 
 def _update_default_kwargs(pretrained_cfg, kwargs, kwargs_filter):
-    """ Update the default_cfg and kwargs before passing to model
+    """Update the default_cfg and kwargs before passing to model
 
     Args:
         pretrained_cfg: input pretrained cfg (updated in-place)
@@ -286,9 +307,9 @@ def _update_default_kwargs(pretrained_cfg, kwargs, kwargs_filter):
 
 
 def resolve_pretrained_cfg(
-        variant: str,
-        pretrained_cfg=None,
-        pretrained_cfg_overlay=None,
+    variant: str,
+    pretrained_cfg=None,
+    pretrained_cfg_overlay=None,
 ) -> PretrainedCfg:
     model_with_tag = variant
     pretrained_tag = None
@@ -309,7 +330,8 @@ def resolve_pretrained_cfg(
     if not pretrained_cfg:
         _logger.warning(
             f"No pretrained configuration specified for {model_with_tag} model. Using a default."
-            f" Please add a config to the model pretrained_cfg registry or pass explicitly.")
+            f" Please add a config to the model pretrained_cfg registry or pass explicitly."
+        )
         pretrained_cfg = PretrainedCfg()  # instance with defaults
 
     pretrained_cfg_overlay = pretrained_cfg_overlay or {}
@@ -321,19 +343,19 @@ def resolve_pretrained_cfg(
 
 
 def build_model_with_cfg(
-        model_cls: Callable,
-        variant: str,
-        pretrained: bool,
-        pretrained_cfg: Optional[Dict] = None,
-        pretrained_cfg_overlay: Optional[Dict] = None,
-        model_cfg: Optional[Any] = None,
-        feature_cfg: Optional[Dict] = None,
-        pretrained_strict: bool = True,
-        pretrained_filter_fn: Optional[Callable] = None,
-        kwargs_filter: Optional[Tuple[str]] = None,
-        **kwargs,
+    model_cls: Callable,
+    variant: str,
+    pretrained: bool,
+    pretrained_cfg: Optional[Dict] = None,
+    pretrained_cfg_overlay: Optional[Dict] = None,
+    model_cfg: Optional[Any] = None,
+    feature_cfg: Optional[Dict] = None,
+    pretrained_strict: bool = True,
+    pretrained_filter_fn: Optional[Callable] = None,
+    kwargs_filter: Optional[Tuple[str]] = None,
+    **kwargs,
 ):
-    """ Build model with specified default_cfg and optional model_cfg
+    """Build model with specified default_cfg and optional model_cfg
 
     This helper fn aids in the construction of a model including:
       * handling default_cfg and associated pretrained weight loading
@@ -359,9 +381,7 @@ def build_model_with_cfg(
 
     # resolve and update model pretrained config and model kwargs
     pretrained_cfg = resolve_pretrained_cfg(
-        variant,
-        pretrained_cfg=pretrained_cfg,
-        pretrained_cfg_overlay=pretrained_cfg_overlay
+        variant, pretrained_cfg=pretrained_cfg, pretrained_cfg_overlay=pretrained_cfg_overlay
     )
 
     # FIXME converting back to dict, PretrainedCfg use should be propagated further, but not into model
@@ -388,7 +408,9 @@ def build_model_with_cfg(
         model = adapt_model_from_file(model, variant)
 
     # For classification models, check class attr, then kwargs, then default to 1k, otherwise 0 for feats
-    num_classes_pretrained = 0 if features else getattr(model, 'num_classes', kwargs.get('num_classes', 1000))
+    num_classes_pretrained = (
+        0 if features else getattr(model, 'num_classes', kwargs.get('num_classes', 1000))
+    )
     if pretrained:
         load_pretrained(
             model,
@@ -416,7 +438,11 @@ def build_model_with_cfg(
                 else:
                     assert False, f'Unknown feature class {feature_cls}'
         model = feature_cls(model, **feature_cfg)
-        model.pretrained_cfg = pretrained_cfg_for_features(pretrained_cfg)  # add back pretrained cfg
-        model.default_cfg = model.pretrained_cfg  # alias for rename backwards compat (default_cfg -> pretrained_cfg)
+        model.pretrained_cfg = pretrained_cfg_for_features(
+            pretrained_cfg
+        )  # add back pretrained cfg
+        model.default_cfg = (
+            model.pretrained_cfg
+        )  # alias for rename backwards compat (default_cfg -> pretrained_cfg)
 
     return model

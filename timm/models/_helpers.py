@@ -8,15 +8,23 @@ from collections import OrderedDict
 from typing import Any, Callable, Dict, Optional, Union
 
 import torch
+
 try:
     import safetensors.torch
+
     _has_safetensors = True
 except ImportError:
     _has_safetensors = False
 
 _logger = logging.getLogger(__name__)
 
-__all__ = ['clean_state_dict', 'load_state_dict', 'load_checkpoint', 'remap_state_dict', 'resume_checkpoint']
+__all__ = [
+    'clean_state_dict',
+    'load_state_dict',
+    'load_checkpoint',
+    'remap_state_dict',
+    'resume_checkpoint',
+]
 
 
 def clean_state_dict(state_dict: Dict[str, Any]) -> Dict[str, Any]:
@@ -29,9 +37,9 @@ def clean_state_dict(state_dict: Dict[str, Any]) -> Dict[str, Any]:
 
 
 def load_state_dict(
-        checkpoint_path: str,
-        use_ema: bool = True,
-        device: Union[str, torch.device] = 'cpu',
+    checkpoint_path: str,
+    use_ema: bool = True,
+    device: Union[str, torch.device] = 'cpu',
 ) -> Dict[str, Any]:
     if checkpoint_path and os.path.isfile(checkpoint_path):
         # Check if safetensors or not and load weights accordingly
@@ -60,13 +68,13 @@ def load_state_dict(
 
 
 def load_checkpoint(
-        model: torch.nn.Module,
-        checkpoint_path: str,
-        use_ema: bool = True,
-        device: Union[str, torch.device] = 'cpu',
-        strict: bool = True,
-        remap: bool = False,
-        filter_fn: Optional[Callable] = None,
+    model: torch.nn.Module,
+    checkpoint_path: str,
+    use_ema: bool = True,
+    device: Union[str, torch.device] = 'cpu',
+    strict: bool = True,
+    remap: bool = False,
+    filter_fn: Optional[Callable] = None,
 ):
     if os.path.splitext(checkpoint_path)[-1].lower() in ('.npz', '.npy'):
         # numpy checkpoint, try to load via model specific load_pretrained fn
@@ -86,31 +94,33 @@ def load_checkpoint(
 
 
 def remap_state_dict(
-        state_dict: Dict[str, Any],
-        model: torch.nn.Module,
-        allow_reshape: bool = True
+    state_dict: Dict[str, Any], model: torch.nn.Module, allow_reshape: bool = True
 ):
-    """ remap checkpoint by iterating over state dicts in order (ignoring original keys).
+    """remap checkpoint by iterating over state dicts in order (ignoring original keys).
     This assumes models (and originating state dict) were created with params registered in same order.
     """
     out_dict = {}
     for (ka, va), (kb, vb) in zip(model.state_dict().items(), state_dict.items()):
-        assert va.numel() == vb.numel(), f'Tensor size mismatch {ka}: {va.shape} vs {kb}: {vb.shape}. Remap failed.'
+        assert (
+            va.numel() == vb.numel()
+        ), f'Tensor size mismatch {ka}: {va.shape} vs {kb}: {vb.shape}. Remap failed.'
         if va.shape != vb.shape:
             if allow_reshape:
                 vb = vb.reshape(va.shape)
             else:
-                assert False,  f'Tensor shape mismatch {ka}: {va.shape} vs {kb}: {vb.shape}. Remap failed.'
+                assert (
+                    False
+                ), f'Tensor shape mismatch {ka}: {va.shape} vs {kb}: {vb.shape}. Remap failed.'
         out_dict[ka] = vb
     return out_dict
 
 
 def resume_checkpoint(
-        model: torch.nn.Module,
-        checkpoint_path: str,
-        optimizer: torch.optim.Optimizer = None,
-        loss_scaler: Any = None,
-        log_info: bool = True,
+    model: torch.nn.Module,
+    checkpoint_path: str,
+    optimizer: torch.optim.Optimizer = None,
+    loss_scaler: Any = None,
+    log_info: bool = True,
 ):
     resume_epoch = None
     if os.path.isfile(checkpoint_path):
@@ -119,7 +129,12 @@ def resume_checkpoint(
             if log_info:
                 _logger.info('Restoring model state from checkpoint...')
             state_dict = clean_state_dict(checkpoint['state_dict'])
-            model.load_state_dict(state_dict)
+            # for classifier_name in ["head"]:
+            #     # completely discard fully connected if model num_classes doesn't match pretrained weights
+            #     state_dict.pop(classifier_name + '.weight', None)
+            #     state_dict.pop(classifier_name + '.bias', None)
+            # strict = False
+            model.load_state_dict(state_dict)  # , strict=strict)
 
             if optimizer is not None and 'optimizer' in checkpoint:
                 if log_info:
@@ -134,10 +149,14 @@ def resume_checkpoint(
             if 'epoch' in checkpoint:
                 resume_epoch = checkpoint['epoch']
                 if 'version' in checkpoint and checkpoint['version'] > 1:
-                    resume_epoch += 1  # start at the next epoch, old checkpoints incremented before save
+                    resume_epoch += (
+                        1  # start at the next epoch, old checkpoints incremented before save
+                    )
 
             if log_info:
-                _logger.info("Loaded checkpoint '{}' (epoch {})".format(checkpoint_path, checkpoint['epoch']))
+                _logger.info(
+                    "Loaded checkpoint '{}' (epoch {})".format(checkpoint_path, checkpoint['epoch'])
+                )
         else:
             model.load_state_dict(checkpoint)
             if log_info:
@@ -146,5 +165,3 @@ def resume_checkpoint(
     else:
         _logger.error("No checkpoint found at '{}'".format(checkpoint_path))
         raise FileNotFoundError()
-
-

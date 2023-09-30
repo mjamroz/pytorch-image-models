@@ -51,6 +51,7 @@ parser.add_argument('--num-classes', type=int, default=1000,
                     help='Number classes in dataset')
 parser.add_argument('--checkpoint', default='', type=str, metavar='PATH',
                     help='path to checkpoint (default: none)')
+parser.add_argument( '--pretrained', action='store_true', default=False, help='Start with pretrained version of specified network (if avail)')
 parser.add_argument('--reparam', default=False, action='store_true',
                     help='Reparameterize model')
 parser.add_argument('--training', default=False, action='store_true',

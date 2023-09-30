@@ -52,7 +52,7 @@ def main():
     if args.onnx_output_opt:
         sess_options.optimized_model_filepath = args.onnx_output_opt
 
-    session = onnxruntime.InferenceSession(args.onnx_input, sess_options)
+    session = onnxruntime.InferenceSession(args.onnx_input, sess_options, providers=["CPUExecutionProvider"])
 
     data_config = resolve_data_config(vars(args))
     loader = create_loader(
