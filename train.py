@@ -1230,6 +1230,7 @@ def main():
     if utils.is_primary(args) and args.log_wandb:
         if has_wandb:
             wandb.init(project=args.experiment, config=args)
+            class2idx_artifact(dataset_train)
         else:
             _logger.warning(
                 "You've requested to log metrics to wandb but package not found. "
@@ -1573,5 +1574,16 @@ def validate(
     return metrics
 
 
+def class2idx_artifact(dataset):
+    import json
+    idx2class = {}
+    artifact = wandb.Artifact("class2idx", type="dataset")
+    with artifact.new_file("class2idx.json") as f:
+        f.write(json.dumps(dataset.reader.class_to_idx))
+    with artifact.new_file("idx2class.json") as f:
+        for k,v in dataset.reader.class_to_idx.items():
+            idx2class[v] = k
+        f.write(json.dumps(idx2class))
+    wandb.log_artifact(artifact)
 if __name__ == '__main__':
     main()

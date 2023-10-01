@@ -129,12 +129,13 @@ def resume_checkpoint(
             if log_info:
                 _logger.info('Restoring model state from checkpoint...')
             state_dict = clean_state_dict(checkpoint['state_dict'])
+            strict = True
             # for classifier_name in ["head"]:
             #     # completely discard fully connected if model num_classes doesn't match pretrained weights
             #     state_dict.pop(classifier_name + '.weight', None)
             #     state_dict.pop(classifier_name + '.bias', None)
             # strict = False
-            model.load_state_dict(state_dict)  # , strict=strict)
+            model.load_state_dict(state_dict, strict=strict)
 
             if optimizer is not None and 'optimizer' in checkpoint:
                 if log_info:
