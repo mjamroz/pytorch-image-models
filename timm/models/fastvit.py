@@ -421,6 +421,7 @@ class ReparamLargeKernelConv(nn.Module):
 def convolutional_stem(
         in_chs: int,
         out_chs: int,
+        act_layer: nn.Module = nn.GELU,
         inference_mode: bool = False
 ) -> nn.Sequential:
     """Build convolutional stem with MobileOne blocks.
@@ -439,6 +440,7 @@ def convolutional_stem(
             out_chs=out_chs,
             kernel_size=3,
             stride=2,
+            act_layer=act_layer,
             inference_mode=inference_mode,
         ),
         MobileOneBlock(
@@ -447,13 +449,15 @@ def convolutional_stem(
             kernel_size=3,
             stride=2,
             group_size=1,
+            act_layer=act_layer,
             inference_mode=inference_mode,
         ),
         MobileOneBlock(
             in_chs=out_chs,
             out_chs=out_chs,
             kernel_size=1,
-            stride=1,            
+            stride=1,
+            act_layer=act_layer,
             inference_mode=inference_mode,
         ),
     )
@@ -510,7 +514,7 @@ class Attention(nn.Module):
         if self.fused_attn:
             x = torch.nn.functional.scaled_dot_product_attention(
                 q, k, v,
-                dropout_p=self.attn_drop.p,
+                dropout_p=self.attn_drop.p if self.training else 0.,
             )
         else:
             q = q * self.scale
@@ -1120,6 +1124,7 @@ class FastVit(nn.Module):
         self.stem = convolutional_stem(
             in_chans,
             embed_dims[0],
+            act_layer,
             inference_mode,
         )
 
@@ -1182,6 +1187,7 @@ class FastVit(nn.Module):
                 group_size=1,
                 inference_mode=inference_mode,
                 use_se=True,
+                act_layer=act_layer,
                 num_conv_branches=1,
             )
             self.head = ClassifierHead(
