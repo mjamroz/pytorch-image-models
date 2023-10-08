@@ -1212,6 +1212,20 @@ def main():
             )
         output_dir = utils.get_outdir(args.output if args.output else './output/train', exp_name)
         decreasing = True if eval_metric == 'loss' else False
+        with open(os.path.join(output_dir, 'args.yaml'), 'w') as f:
+            f.write(args_text)
+
+        wandb_run = None
+        if args.log_wandb:
+            if has_wandb:
+                wandb_run = wandb.init(project=args.experiment, config=args)
+                class2idx_artifact(dataset_train)
+            else:
+                _logger.warning(
+                    "You've requested to log metrics to wandb but package not found. "
+                    "Metrics not being logged to wandb, try `pip install wandb`"
+                )
+
         saver = utils.CheckpointSaver(
             model=model,
             optimizer=optimizer,
@@ -1223,20 +1237,8 @@ def main():
             decreasing=decreasing,
             max_history=args.checkpoint_hist,
             log_wandb=args.log_wandb and has_wandb,
+            wandb_run = wandb_run
         )
-        with open(os.path.join(output_dir, 'args.yaml'), 'w') as f:
-            f.write(args_text)
-
-    if utils.is_primary(args) and args.log_wandb:
-        if has_wandb:
-            wandb.init(project=args.experiment, config=args)
-            class2idx_artifact(dataset_train)
-        else:
-            _logger.warning(
-                "You've requested to log metrics to wandb but package not found. "
-                "Metrics not being logged to wandb, try `pip install wandb`"
-            )
-
     # setup learning rate schedule and starting epoch
     updates_per_epoch = (len(loader_train) + args.grad_accum_steps - 1) // args.grad_accum_steps
     lr_scheduler, num_epochs = create_scheduler_v2(
@@ -1322,6 +1324,8 @@ def main():
                     write_header=best_metric is None,
                     log_wandb=args.log_wandb and has_wandb,
                 )
+            # if args.log_wandb:
+            #     wandb.log({"top1": eval_metrics.get("top1"), "epochs": wandb.config.epochs, "clip-grad": wandb.config.clip_grad, "lr": wandb.config.lr})
 
             if saver is not None:
                 # save proper checkpoint with eval metric
@@ -1564,6 +1568,7 @@ def validate(
 
     metrics = OrderedDict([('loss', losses_m.avg), ('top1', top1_m.avg), ('top5', top5_m.avg)])
     if args.log_wandb and (acc := top1_m.avg) < (threshold := 10):
+
         wandb.alert(
             title='Low accuracy',
             text=f'Accuracy {acc} is below the acceptable threshold {threshold}',

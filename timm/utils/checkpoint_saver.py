@@ -39,6 +39,7 @@ class CheckpointSaver:
         max_history=10,
         unwrap_fn=unwrap_model,
         log_wandb=False,
+        wandb_run = None
     ):
         # objects to save state_dicts of
         self.model = model
@@ -47,6 +48,7 @@ class CheckpointSaver:
         self.model_ema = model_ema
         self.amp_scaler = amp_scaler
         self.log_wandb = log_wandb
+        self.wandb_run = wandb_run
 
         # state
         self.checkpoint_files = []  # (filename, metric) tuples in order of decreasing betterness
@@ -111,7 +113,6 @@ class CheckpointSaver:
                     last_model = wandb.Artifact("model", type="model")
                     last_model.add_file(best_save_path)
                     wandb.log_artifact(last_model, aliases=["best"])
-
         return (None, None) if self.best_metric is None else (self.best_metric, self.best_epoch)
 
     def _save(self, save_path, epoch, metric=None):
