@@ -843,8 +843,12 @@ def _parse_args():
 def main():
     utils.setup_default_logging()
     args, args_text = _parse_args()
+    wandb.init()
+    if wandb.config:
+        for k, v in dict(wandb.config).items():
+            setattr(args, k.replace("-", "_"), v)
 
-    if torch.cuda.is_available():
+    if torch.backends.cuda.is_built():
         torch.backends.cuda.matmul.allow_tf32 = True
         torch.backends.cudnn.benchmark = True
 
@@ -1215,22 +1219,6 @@ def main():
         with open(os.path.join(output_dir, 'args.yaml'), 'w') as f:
             f.write(args_text)
 
-        wandb_run = None
-        if args.log_wandb:
-            if has_wandb:
-                wandb_run = wandb.init(
-                    project=args.experiment,
-                    config=args,
-                    resume=args.resume and not args.no_resume_opt,
-                )
-                class2idx_artifact(dataset_train)
-                wandb.watch(model)
-            else:
-                _logger.warning(
-                    "You've requested to log metrics to wandb but package not found. "
-                    "Metrics not being logged to wandb, try `pip install wandb`"
-                )
-
         saver = utils.CheckpointSaver(
             model=model,
             optimizer=optimizer,
@@ -1241,8 +1229,6 @@ def main():
             recovery_dir=output_dir,
             decreasing=decreasing,
             max_history=args.checkpoint_hist,
-            log_wandb=args.log_wandb and has_wandb,
-            wandb_run=wandb_run,
         )
     # setup learning rate schedule and starting epoch
     updates_per_epoch = (len(loader_train) + args.grad_accum_steps - 1) // args.grad_accum_steps
@@ -1329,8 +1315,7 @@ def main():
                     write_header=best_metric is None,
                     log_wandb=args.log_wandb and has_wandb,
                 )
-            # if args.log_wandb:
-            #     wandb.log({"top1": eval_metrics.get("top1"), "epochs": wandb.config.epochs, "clip-grad": wandb.config.clip_grad, "lr": wandb.config.lr})
+            wandb.log(dict(wandb.config))
 
             if saver is not None:
                 # save proper checkpoint with eval metric
@@ -1481,6 +1466,8 @@ def train_one_epoch(
                     f'LR: {lr:.3e}  '
                     f'Data: {data_time_m.val:.3f} ({data_time_m.avg:.3f})'
                 )
+                if losses_m.val is None:
+                    raise Exception('Loss is NaN')
 
                 if args.save_images and output_dir:
                     torchvision.utils.save_image(
@@ -1571,30 +1558,7 @@ def validate(
                     f'Acc@5: {top5_m.val:>7.3f} ({top5_m.avg:>7.3f})'
                 )
 
-    metrics = OrderedDict([('loss', losses_m.avg), ('top1', top1_m.avg), ('top5', top5_m.avg)])
-    if args.log_wandb and (acc := top1_m.avg) < (threshold := 10):
-        wandb.alert(
-            title='Low accuracy',
-            text=f'Accuracy {acc} is below the acceptable threshold {threshold}',
-            level=wandb.AlertLevel.WARN,
-            wait_duration=timedelta(minutes=5),
-        )
-
-    return metrics
-
-
-def class2idx_artifact(dataset):
-    import json
-
-    idx2class = {}
-    artifact = wandb.Artifact("class2idx", type="dataset")
-    with artifact.new_file("class2idx.json") as f:
-        f.write(json.dumps(dataset.reader.class_to_idx))
-    with artifact.new_file("idx2class.json") as f:
-        for k, v in dataset.reader.class_to_idx.items():
-            idx2class[v] = k
-        f.write(json.dumps(idx2class))
-    wandb.log_artifact(artifact)
+    return OrderedDict([('loss', losses_m.avg), ('top1', top1_m.avg), ('top5', top5_m.avg)])
 
 
 if __name__ == '__main__':
